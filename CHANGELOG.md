@@ -1,3 +1,6 @@
+## 0.0.6
+* Add support for Uint8List audio output.
+
 ## 0.0.5
 * Add support for Silero VAD v5 model.
 * Expose `onRealSpeechStart` callback to notify when the number of speech positive frames exceeds the minimum speech frames (i.e. not a misfire event).
