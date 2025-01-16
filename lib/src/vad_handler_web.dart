@@ -4,22 +4,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
+
 import 'package:flutter/foundation.dart';
+
 import 'vad_handler_base.dart';
 
 /// Start listening for voice activity detection (JS-binding)
 @JS('startListeningImpl')
-external void startListeningImpl(
-    double positiveSpeechThreshold,
-    double negativeSpeechThreshold,
-    int preSpeechPadFrames,
-    int redemptionFrames,
-    int frameSamples,
-    int minSpeechFrames,
-    bool submitUserSpeechOnPause,
-    String model,
-    String baseAssetPath,
-    String onnxWASMBasePath);
+external void startListeningImpl(double positiveSpeechThreshold, double negativeSpeechThreshold, int preSpeechPadFrames, int redemptionFrames,
+    int frameSamples, int minSpeechFrames, bool submitUserSpeechOnPause, String model, String baseAssetPath, String onnxWASMBasePath);
 
 /// Stop listening for voice activity detection (JS-binding)
 @JS('stopListeningImpl')
@@ -39,16 +32,12 @@ external void executeDartHandler();
 
 /// VadHandlerWeb class
 class VadHandlerWeb implements VadHandlerBase {
-  final StreamController<List<double>> _onSpeechEndController =
-      StreamController<List<double>>.broadcast();
-  final StreamController<void> _onSpeechStartController =
-      StreamController<void>.broadcast();
-  final StreamController<void> _onRealSpeechStartController =
-      StreamController<void>.broadcast();
-  final StreamController<void> _onVADMisfireController =
-      StreamController<void>.broadcast();
-  final StreamController<String> _onErrorController =
-      StreamController<String>.broadcast();
+  final StreamController<Uint8List> _onSpeechEndPCMController = StreamController<Uint8List>.broadcast();
+  final StreamController<List<double>> _onSpeechEndController = StreamController<List<double>>.broadcast();
+  final StreamController<void> _onSpeechStartController = StreamController<void>.broadcast();
+  final StreamController<void> _onRealSpeechStartController = StreamController<void>.broadcast();
+  final StreamController<void> _onVADMisfireController = StreamController<void>.broadcast();
+  final StreamController<String> _onErrorController = StreamController<String>.broadcast();
 
   /// Whether to print debug messages
   bool isDebug = false;
@@ -61,6 +50,9 @@ class VadHandlerWeb implements VadHandlerBase {
 
   @override
   Stream<List<double>> get onSpeechEnd => _onSpeechEndController.stream;
+
+  @override
+  Stream<Uint8List> get onSpeechEndPCM => _onSpeechEndPCMController.stream;
 
   @override
   Stream<void> get onSpeechStart => _onSpeechStartController.stream;
@@ -84,13 +76,10 @@ class VadHandlerWeb implements VadHandlerBase {
       int minSpeechFrames = 3,
       bool submitUserSpeechOnPause = false,
       String model = 'legacy',
-      String baseAssetPath =
-          'https://cdn.jsdelivr.net/gh/ganit-guru/vad-cdn@master/dist/',
-      String onnxWASMBasePath =
-          'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/'}) {
+      String baseAssetPath = 'https://cdn.jsdelivr.net/gh/ganit-guru/vad-cdn@master/dist/',
+      String onnxWASMBasePath = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/'}) {
     if (isDebug) {
-      debugPrint(
-          'VadHandlerWeb: startListening: Calling startListeningImpl with parameters: '
+      debugPrint('VadHandlerWeb: startListening: Calling startListeningImpl with parameters: '
           'positiveSpeechThreshold: $positiveSpeechThreshold, '
           'negativeSpeechThreshold: $negativeSpeechThreshold, '
           'preSpeechPadFrames: $preSpeechPadFrames, '
@@ -102,24 +91,14 @@ class VadHandlerWeb implements VadHandlerBase {
           'baseAssetPath: $baseAssetPath'
           'onnxWASMBasePath: $onnxWASMBasePath');
     }
-    startListeningImpl(
-        positiveSpeechThreshold,
-        negativeSpeechThreshold,
-        preSpeechPadFrames,
-        redemptionFrames,
-        frameSamples,
-        minSpeechFrames,
-        submitUserSpeechOnPause,
-        model,
-        baseAssetPath,
-        onnxWASMBasePath);
+    startListeningImpl(positiveSpeechThreshold, negativeSpeechThreshold, preSpeechPadFrames, redemptionFrames, frameSamples, minSpeechFrames,
+        submitUserSpeechOnPause, model, baseAssetPath, onnxWASMBasePath);
   }
 
   /// Handle an event from the JS side
   void handleEvent(String eventType, String payload) {
     try {
-      Map<String, dynamic> eventData =
-          payload.isNotEmpty ? json.decode(payload) : {};
+      Map<String, dynamic> eventData = payload.isNotEmpty ? json.decode(payload) : {};
 
       switch (eventType) {
         case 'onError':
@@ -130,14 +109,13 @@ class VadHandlerWeb implements VadHandlerBase {
           break;
         case 'onSpeechEnd':
           if (eventData.containsKey('audioData')) {
-            final List<double> audioData = (eventData['audioData'] as List)
-                .map((e) => (e as num).toDouble())
-                .toList();
+            final List<double> audioData = (eventData['audioData'] as List).map((e) => (e as num).toDouble()).toList();
             if (isDebug) {
-              debugPrint(
-                  'VadHandlerWeb: onSpeechEnd: first 5 samples: ${audioData.sublist(0, 5)}');
+              debugPrint('VadHandlerWeb: onSpeechEnd: first 5 samples: ${audioData.sublist(0, 5)}');
             }
             _onSpeechEndController.add(audioData);
+
+            _onSpeechEndPCMController.add(eventData['audioData'] as Uint8List);
           } else {
             if (isDebug) {
               debugPrint('Invalid VAD Data received: $eventData');
@@ -195,5 +173,4 @@ class VadHandlerWeb implements VadHandlerBase {
 /// Create a VAD handler for the web
 /// isDebug is used to print debug messages
 /// modelPath is not used in the web implementation, adding it will not have any effect
-VadHandlerBase createVadHandler({required isDebug, modelPath}) =>
-    VadHandlerWeb(isDebug: isDebug);
+VadHandlerBase createVadHandler({required isDebug, modelPath}) => VadHandlerWeb(isDebug: isDebug);

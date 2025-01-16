@@ -1,11 +1,15 @@
 // vad_handler_base.dart
 
 import 'dart:async';
+import 'dart:typed_data';
 
 /// Abstract class for VAD handler
 abstract class VadHandlerBase {
   /// Stream of speech end events
   Stream<List<double>> get onSpeechEnd;
+
+  /// Stream of speech end events
+  Stream<Uint8List> get onSpeechEndPCM;
 
   /// Stream of speech start events
   Stream<void> get onSpeechStart;
@@ -29,10 +33,8 @@ abstract class VadHandlerBase {
       int minSpeechFrames = 3,
       bool submitUserSpeechOnPause = false,
       String model = 'legacy',
-      String baseAssetPath =
-          'https://cdn.jsdelivr.net/gh/ganit-guru/vad-cdn@master/dist/',
-      String onnxWASMBasePath =
-          'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/'});
+      String baseAssetPath = 'https://cdn.jsdelivr.net/gh/ganit-guru/vad-cdn@master/dist/',
+      String onnxWASMBasePath = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/'});
 
   /// Stop listening for speech events
   void stopListening();

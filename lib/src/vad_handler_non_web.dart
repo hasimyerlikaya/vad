@@ -1,10 +1,13 @@
 // vad_handler_non_web.dart
 
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/cupertino.dart';
 import 'package:record/record.dart';
 import 'package:vad/src/vad_handler_base.dart';
 import 'package:vad/src/vad_iterator.dart';
-import 'dart:async';
+
 import 'vad_event.dart';
 import 'vad_iterator_base.dart';
 
@@ -26,14 +29,13 @@ class VadHandlerNonWeb implements VadHandlerBase {
   static const int sampleRate = 16000;
 
   /// Default Silero VAD Legacy (v4) model path
-  static const String vadLegacyModelPath =
-      'packages/vad/assets/models/silero_vad_legacy.onnx';
+  static const String vadLegacyModelPath = 'packages/vad/assets/models/silero_vad_legacy.onnx';
 
   /// Default Silero VAD V5 model path
-  static const String vadV5ModelPath =
-      'packages/vad/assets/models/silero_vad_v5.onnx';
+  static const String vadV5ModelPath = 'packages/vad/assets/models/silero_vad_v5.onnx';
 
   final _onSpeechEndController = StreamController<List<double>>.broadcast();
+  final _onSpeechEndPCMController = StreamController<Uint8List>.broadcast();
   final _onSpeechStartController = StreamController<void>.broadcast();
   final _onRealSpeechStartController = StreamController<void>.broadcast();
   final _onVADMisfireController = StreamController<void>.broadcast();
@@ -41,6 +43,9 @@ class VadHandlerNonWeb implements VadHandlerBase {
 
   @override
   Stream<List<double>> get onSpeechEnd => _onSpeechEndController.stream;
+
+  @override
+  Stream<Uint8List> get onSpeechEndPCM => _onSpeechEndPCMController.stream;
 
   @override
   Stream<void> get onSpeechStart => _onSpeechStartController.stream;
@@ -60,8 +65,7 @@ class VadHandlerNonWeb implements VadHandlerBase {
   /// Handle VAD event
   void _handleVadEvent(VadEvent event) {
     if (isDebug) {
-      debugPrint(
-          'VadHandlerNonWeb: VAD Event: ${event.type} with message ${event.message}');
+      debugPrint('VadHandlerNonWeb: VAD Event: ${event.type} with message ${event.message}');
     }
     switch (event.type) {
       case VadEventType.start:
@@ -75,6 +79,8 @@ class VadHandlerNonWeb implements VadHandlerBase {
           final int16List = event.audioData!.buffer.asInt16List();
           final floatSamples = int16List.map((e) => e / 32768.0).toList();
           _onSpeechEndController.add(floatSamples);
+
+          _onSpeechEndPCMController.add(event.audioData!);
         }
         break;
       case VadEventType.misfire:
@@ -96,10 +102,8 @@ class VadHandlerNonWeb implements VadHandlerBase {
       int minSpeechFrames = 3,
       bool submitUserSpeechOnPause = false,
       String model = 'legacy',
-      String baseAssetPath =
-          'https://cdn.jsdelivr.net/gh/ganit-guru/vad-cdn@master/dist/',
-      String onnxWASMBasePath =
-          'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/'}) async {
+      String baseAssetPath = 'https://cdn.jsdelivr.net/gh/ganit-guru/vad-cdn@master/dist/',
+      String onnxWASMBasePath = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/'}) async {
     if (!_isInitialized) {
       _vadIterator = VadIterator.create(
         isDebug: isDebug,
@@ -128,8 +132,7 @@ class VadHandlerNonWeb implements VadHandlerBase {
 
     bool hasPermission = await _audioRecorder.hasPermission();
     if (!hasPermission) {
-      _onErrorController
-          .add('VadHandlerNonWeb: No permission to record audio.');
+      _onErrorController.add('VadHandlerNonWeb: No permission to record audio.');
       if (isDebug) {
         debugPrint('VadHandlerNonWeb: No permission to record audio.');
       }
@@ -138,13 +141,7 @@ class VadHandlerNonWeb implements VadHandlerBase {
 
     // Start recording with a stream
     final stream = await _audioRecorder.startStream(const RecordConfig(
-        encoder: AudioEncoder.pcm16bits,
-        sampleRate: sampleRate,
-        bitRate: 16,
-        numChannels: 1,
-        echoCancel: true,
-        autoGain: true,
-        noiseSuppress: true));
+        encoder: AudioEncoder.pcm16bits, sampleRate: sampleRate, bitRate: 16, numChannels: 1, echoCancel: true, autoGain: true, noiseSuppress: true));
 
     _audioStreamSubscription = stream.listen((data) async {
       await _vadIterator.processAudioData(data);
@@ -184,5 +181,4 @@ class VadHandlerNonWeb implements VadHandlerBase {
 }
 
 /// Create a VAD handler for the non-web platforms
-VadHandlerBase createVadHandler({required isDebug, modelPath}) =>
-    VadHandlerNonWeb(isDebug: isDebug, modelPath: modelPath);
+VadHandlerBase createVadHandler({required isDebug, modelPath}) => VadHandlerNonWeb(isDebug: isDebug, modelPath: modelPath);
